@@ -37,3 +37,5 @@ outputs/ # metrics and explanation artifacts
 - Instructor vs student explanation views
 - Integration with an offline AI tutor
 - Fairness and bias analysis
+
+THIS PROJECT IS STILL IN PROGRESS
