@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Outputs / artifacts
+outputs/
+*.joblib
+*.png
+*.json
+
+# Data (keep generated csv out of repo if you want)
+# data/*.csv
