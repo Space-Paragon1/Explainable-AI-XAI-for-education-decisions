@@ -1,8 +1,14 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import argparse
 from pathlib import Path
 
 import numpy as np
 from sklearn.model_selection import train_test_split
+
+import joblib
+
 
 from src.config import FEATURE_COLUMNS, Paths
 from src.data_loader import load_dataset
@@ -25,6 +31,9 @@ def main():
     explanations_dir = out_root / "explanations"
     models_dir.mkdir(parents=True, exist_ok=True)
     metrics_dir.mkdir(parents=True, exist_ok=True)
+    # Ensure explanations_dir is a directory; if it's a file, remove it first
+    if explanations_dir.exists() and not explanations_dir.is_dir():
+        explanations_dir.unlink()
     explanations_dir.mkdir(parents=True, exist_ok=True)
 
     # Load data
@@ -43,6 +52,9 @@ def main():
     for model_name in ["logreg", "rf"]:
         trained = train(model_name, X_train, y_train)
         model = trained.pipeline
+
+        # Save the trained model
+        joblib.dump(model, models_dir / f"{model_name}.joblib")
 
         metrics = evaluate_binary(model, X_test, y_test)
 
