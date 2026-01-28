@@ -58,6 +58,8 @@ def explain_with_shap(
     # Global summary plot
     summary_path = out_dir / f"{model_name}_shap_summary.png"
     plt.figure()
+    # Ensure feature_names is a numpy array for correct indexing
+    feature_names = np.array(feature_names)
     shap.summary_plot(sv, Xe, feature_names=feature_names, show=False)
     plt.tight_layout()
     plt.savefig(summary_path, dpi=200)
@@ -76,8 +78,8 @@ def explain_with_shap(
         rows.append(
             {
                 "row_index": int(i),
-                "top_features": "; ".join([feature_names[j] for j in top]),
-                "top_contributions": "; ".join([f"{contrib[j]:.4f}" for j in top]),
+                "top_features": "; ".join([str(feature_names[j]) for j in top]),
+                "top_contributions": "; ".join([f"{np.ravel(contrib[j])[0]:.4f}" for j in top]),
             }
         )
 
