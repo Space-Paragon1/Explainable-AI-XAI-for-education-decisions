@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 @dataclass(frozen=True)
 class Paths:
@@ -23,4 +24,13 @@ FEATURE_COLUMNS = [
     "device_reliability",
 ]
 
+# Demographic columns included in CSV for fairness analysis — NOT used in model training
+DEMOGRAPHIC_COLUMNS = [
+    "gender",       # 0=female, 1=male, 2=non-binary
+    "ses_index",    # Socioeconomic status 0.0–1.0 (higher = more resources)
+    "first_gen",    # First-generation college student: 1=yes, 0=no
+]
+
 TARGET_COLUMN = "mastery"  # 1 = mastered / on-track, 0 = at-risk
+
+ModelName = Literal["logreg", "rf", "xgb", "lgbm"]
