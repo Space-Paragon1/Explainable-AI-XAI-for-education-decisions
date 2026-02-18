@@ -13,8 +13,13 @@ def generate_student_dataset(n: int = 3000, seed: int = 42) -> pd.DataFrame:
     """
     Generate a privacy-safe synthetic dataset that mimics common learning analytics signals.
     Target: mastery (1) vs at-risk (0)
+
+    Includes demographic columns (gender, ses_index, first_gen) for fairness analysis.
+    Demographics are NOT used in model training — only for post-hoc bias evaluation.
     """
     rng = np.random.default_rng(seed)
+
+    # ── Academic / behavioral features ──────────────────────────────────────
 
     # Study time per week (minutes)
     study_time_min = np.clip(rng.normal(loc=220, scale=110, size=n), 0, 900)
@@ -46,9 +51,9 @@ def generate_student_dataset(n: int = 3000, seed: int = 42) -> pd.DataFrame:
     # Device reliability (0-1) (connectivity/tech issues)
     device_reliability = np.clip(rng.beta(a=5.0, b=1.8, size=n), 0, 1)
 
-    # Create a probabilistic mastery label with realistic relationships
-    # Positive contributors: practice, quiz score, prereq mastery, attendance, study time, device reliability
-    # Negative contributors: days inactive, high stress (moderate), excessive hint dependence (slightly)
+    # ── Mastery label ────────────────────────────────────────────────────────
+    # Positive contributors: practice, quiz score, prereq mastery, attendance, study time
+    # Negative contributors: days inactive, high stress, excessive hint dependence
     linear = (
         0.006 * study_time_min
         + 2.0 * practice_completion_rate
@@ -64,11 +69,21 @@ def generate_student_dataset(n: int = 3000, seed: int = 42) -> pd.DataFrame:
     )
 
     p_mastery = sigmoid(linear)
-
     mastery = rng.binomial(n=1, p=p_mastery, size=n).astype(int)
+
+    # ── Demographic features (for fairness analysis only) ────────────────────
+    # gender: 0=female, 1=male, 2=non-binary  (roughly uniform)
+    gender = rng.integers(0, 3, size=n)
+
+    # ses_index: socioeconomic status 0.0–1.0; Beta(2,2) centered around 0.5
+    ses_index = np.clip(rng.beta(a=2.0, b=2.0, size=n), 0, 1)
+
+    # first_gen: first-generation college student (35% prevalence)
+    first_gen = rng.binomial(n=1, p=0.35, size=n)
 
     df = pd.DataFrame(
         {
+            # Academic features (used in model)
             "study_time_min": study_time_min.round(1),
             "practice_completion_rate": practice_completion_rate.round(3),
             "avg_quiz_score": avg_quiz_score.round(1),
@@ -79,7 +94,12 @@ def generate_student_dataset(n: int = 3000, seed: int = 42) -> pd.DataFrame:
             "stress_index": stress_index.round(3),
             "prereq_mastery": prereq_mastery.round(3),
             "device_reliability": device_reliability.round(3),
+            # Target
             "mastery": mastery,
+            # Demographic features (fairness analysis only)
+            "gender": gender,
+            "ses_index": ses_index.round(3),
+            "first_gen": first_gen,
         }
     )
 
@@ -101,6 +121,7 @@ def main():
 
     mastery_rate = df["mastery"].mean()
     print(f"Saved dataset to {out_path} | n={len(df)} | mastery_rate={mastery_rate:.3f}")
+    print(f"Demographic columns added: gender, ses_index, first_gen")
 
 
 if __name__ == "__main__":
