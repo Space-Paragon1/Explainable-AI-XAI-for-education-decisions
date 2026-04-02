@@ -1,22 +1,57 @@
-# Python
+# ── Python ────────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+dist/
+build/
+
+# ── Virtual environments ──────────────────────────────────────────────────────
 .venv/
 venv/
+env/
 .env
 
-# Jupyter
+# ── Jupyter ───────────────────────────────────────────────────────────────────
 .ipynb_checkpoints/
+*.nbconvert/
 
-# OS
+# ── pytest ────────────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Outputs / artifacts
-outputs/
-*.joblib
-*.png
-*.json
+# ── Logs / temp ───────────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.bak
 
-# Data (keep generated csv out of repo if you want)
-# data/*.csv
+# ── Generated model artifacts (large binaries — regenerate with run_all.py) ──
+outputs/models/
+outputs/explanations/
+outputs/metrics/
+
+# Keep the outputs/ directory structure tracked
+!outputs/.gitkeep
+!outputs/models/.gitkeep
+!outputs/explanations/.gitkeep
+!outputs/metrics/.gitkeep
+
+# ── Dataset (synthetic, regenerable — commit for reproducibility) ─────────────
+# data/student_data.csv is intentionally tracked (synthetic, small enough)
+
+# ── Claude Code ───────────────────────────────────────────────────────────────
+.claude/
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace

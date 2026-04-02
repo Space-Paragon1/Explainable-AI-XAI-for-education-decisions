@@ -1,47 +1,79 @@
 # Explainable AI for Educational Decision-Making (XAI-ED)
 
-> A research-grade, end-to-end explainable AI pipeline for student performance prediction — with interactive dashboard, fairness analysis, REST API, and dual-audience explanations.
+> A research-grade, end-to-end explainable AI pipeline for student performance prediction —
+> with realistic equity gaps, multi-method XAI, statistical model comparison, interactive
+> dashboard, REST API, reproducible notebooks, and a full test suite.
 
 ---
 
 ## Overview
 
-XAI-ED bridges the gap between powerful machine learning and transparent educational decision-making. Opaque "black-box" predictions raise ethical, pedagogical, and trust concerns in education. This project embeds explainability directly into every layer of the system — from model selection and evaluation to student-facing language and instructor reports.
+XAI-ED bridges the gap between powerful machine learning and transparent educational
+decision-making. Opaque "black-box" predictions raise ethical, pedagogical, and trust
+concerns in education. This project embeds explainability at every layer of the system —
+from model training and evaluation to student-facing language, instructor reports,
+counterfactual recommendations, and group-level fairness auditing.
 
-**Key contributions:**
-- Four ML models with unified training API (Logistic Regression, Random Forest, XGBoost, LightGBM)
-- Two complementary XAI methods: **SHAP** + **LIME** — with comparison artifacts
-- **Counterfactual explanations** — what a student would need to change to flip their prediction
-- **Dual-audience explanations** — friendly student view + technical instructor view
-- **Fairness & bias analysis** — group-level metrics across demographic subgroups
-- **Interactive Streamlit dashboard** — 7-tab interface for exploration and demonstration
-- **FastAPI REST API** — deployable service with auto-generated docs
+**Key research contributions:**
+
+1. **Dual-Audience Explanations** — The same SHAP computation produces a student-friendly
+   actionable message *and* a technical instructor report with risk tiers, SHAP feature
+   tables, intervention urgency, and counterfactual summaries.
+2. **Multi-Method XAI** — SHAP (TreeExplainer / KernelExplainer) and LIME are both
+   computed for every model, enabling cross-method agreement analysis to measure
+   explanation stability.
+3. **Equity-Aware Dataset** — Demographic features (gender, SES, first-gen) are generated
+   with realistic structural correlations (low-SES → less study time / attendance /
+   device reliability; first-gen → lower prereq mastery) producing genuine fairness gaps
+   for meaningful bias evaluation.
+4. **Expanded Counterfactual Guidance** — Greedy hill-climbing over **7 actionable
+   student behaviors** (practice completion, study time, attendance, quiz attempts,
+   prereq mastery, hint dependence, stress) produces prescriptive "what must change"
+   recommendations.
+5. **Statistical Rigor** — 5-fold CV with mean ± std for 5 metrics, plus McNemar's test
+   for pairwise model significance, and calibration reliability diagrams.
+6. **SES Fairness Axis** — `ses_index` (continuous 0–1) is auto-binned into
+   Low / Medium / High terciles for fairness analysis, alongside gender and first-gen.
 
 ---
 
-## Architecture
+## Project Structure
 
 ```
-XAI-ED
+XAI-ED/
 ├── src/
-│   ├── config.py           Configuration, paths, feature definitions
-│   ├── data_gen.py         Synthetic student dataset generator (with demographics)
+│   ├── config.py           Paths, feature lists, demographic constants
+│   ├── data_gen.py         Synthetic dataset generator (realistic equity gaps)
 │   ├── data_loader.py      CSV loading with column validation
-│   ├── train_model.py      Model training: LogReg, RF, XGBoost, LightGBM
-│   ├── evaluate.py         Metrics: accuracy, F1, AUC, MCC, Brier + cross-validation + calibration
-│   ├── explain.py          SHAP explanations (global + local)
-│   ├── lime_explain.py     LIME explanations (global + local)
-│   ├── counterfactual.py   Minimal-edit counterfactual engine
+│   ├── train_model.py      4 sklearn Pipelines: LogReg, RF, XGBoost, LightGBM
+│   ├── evaluate.py         7 metrics + 5-fold CV + McNemar test + calibration
+│   ├── explain.py          SHAP global/local (handles all output formats)
+│   ├── lime_explain.py     LIME global/local explanations
+│   ├── counterfactual.py   Greedy hill-climbing over 7 controllable features
 │   ├── translator.py       Student view + Instructor view text generation
-│   └── fairness.py         Group-level fairness metrics
+│   └── fairness.py         Group-level fairness metrics + SES auto-binning
+├── scripts/
+│   └── run_all.py          Full pipeline: train 4 models + SHAP + LIME + CV + McNemar
+├── notebooks/
+│   ├── 01_data_exploration.ipynb    EDA, distributions, equity gap analysis
+│   ├── 02_model_comparison.ipynb    Training, CV, ROC, calibration, McNemar
+│   ├── 03_xai_deep_dive.ipynb       SHAP, LIME, agreement analysis, fairness
+│   └── 04_case_studies.ipynb        End-to-end walkthroughs for 4 risk tiers
+├── tests/
+│   ├── conftest.py                  Shared pytest fixtures
+│   ├── test_data_gen.py             Dataset shape, ranges, equity gap assertions
+│   ├── test_evaluate.py             Metric correctness, CV structure, McNemar
+│   ├── test_fairness.py             Group metrics, SES binning, known-gap detection
+│   └── test_counterfactual.py       Flip logic, bounds, controllable features
 ├── data/
-│   └── student_data.csv    3,000 synthetic student records (with demographics)
+│   └── student_data.csv    3,000 synthetic student records with demographics
 ├── outputs/
-│   ├── models/             Trained model artifacts (.joblib)
-│   ├── metrics/            Evaluation metrics (.json)
-│   └── explanations/       SHAP/LIME plots, local explanation CSVs
-├── dashboard.py            Streamlit interactive dashboard (7 tabs)
-└── app.py                  FastAPI REST API
+│   ├── models/             Trained .joblib pipelines (4 models)
+│   ├── metrics/            metrics.json (7 metrics + CV + McNemar per model)
+│   └── explanations/       SHAP/LIME summary PNGs + local explanation CSVs
+├── dashboard.py            Streamlit interactive dashboard (9 tabs)
+├── app.py                  FastAPI REST API (8 endpoints)
+└── requirements.txt
 ```
 
 ---
@@ -49,86 +81,122 @@ XAI-ED
 ## Features
 
 ### Models
-| Model | Type | Notes |
-|-------|------|-------|
-| Logistic Regression | Interpretable | Baseline, StandardScaler |
-| Random Forest | Ensemble | 300 trees, balanced classes |
-| XGBoost | Gradient Boosting | scale_pos_weight auto-computed |
-| LightGBM | Gradient Boosting | Fast, memory-efficient |
+
+| Model | Type | Class Imbalance Handling |
+|-------|------|--------------------------|
+| Logistic Regression | Linear | `class_weight="balanced"` |
+| Random Forest | Ensemble (300 trees) | `class_weight="balanced"` |
+| XGBoost | Gradient Boosting | `scale_pos_weight` auto-computed |
+| LightGBM | Gradient Boosting | `class_weight="balanced"` |
 
 ### Explainability
-| Method | Scope | Output |
-|--------|-------|--------|
-| SHAP (TreeExplainer) | Global + Local | Summary plot, per-student CSV |
-| SHAP (KernelExplainer) | Global + Local | For non-tree models |
-| LIME | Global + Local | Summary bar chart, per-student CSV |
-| Counterfactual | Local | Minimal edits to flip prediction |
 
-### Evaluation (per model)
-- Accuracy, Precision, Recall, F1 (weighted)
-- ROC-AUC, Brier Score, Matthews Correlation Coefficient
-- 5-fold Stratified Cross-Validation (mean +/- std)
-- Calibration Curves (reliability diagram)
+| Method | Scope | Model Types | Output |
+|--------|-------|-------------|--------|
+| SHAP TreeExplainer | Global + Local | RF, XGBoost, LightGBM | Beeswarm PNG, per-student CSV |
+| SHAP KernelExplainer | Global + Local | Logistic Regression | Beeswarm PNG, per-student CSV |
+| LIME | Global + Local | All (model-agnostic) | Importance bar chart PNG, per-student CSV |
+| Counterfactual | Local | All | Minimal-edit table with steps and delta |
+
+### Evaluation
+
+| Metric | Description |
+|--------|-------------|
+| Accuracy | Overall correctness |
+| Precision / Recall / F1 | Classification performance |
+| ROC-AUC | Discrimination ability |
+| Brier Score | Probability calibration |
+| Matthews Correlation Coefficient | Balanced metric for imbalanced classes |
+| 5-fold CV (mean ± std) | Generalisation stability |
+| McNemar's Test | Pairwise statistical significance (χ² continuity-corrected) |
+| Calibration Curves | Reliability diagrams |
 
 ### Fairness Analysis
-Computes group-level metrics across demographic subgroups:
-- **Equal Opportunity** (TPR parity)
-- **Demographic Parity** (positive prediction rate parity)
-- **Predictive Parity** (precision parity)
-- **Disparate Impact Ratio** (80% rule)
 
-### Dashboard (7 Tabs)
-1. **Student Overview** — prediction badge, probability, features, student explanation
-2. **SHAP Explanations** — global summary + local waterfall bar chart + LIME comparison
-3. **Counterfactual** — before/after table showing minimal changes needed
-4. **What-If Simulator** — live sliders with real-time prediction update
-5. **Model Comparison** — metrics table, ROC curves overlay, calibration curves
-6. **Fairness Analysis** — per-group bar charts, disparate impact, parity gaps
-7. **Instructor Report** — technical view + downloadable JSON
+Group-level metrics across three demographic axes:
+
+| Axis | Type | Groups |
+|------|------|--------|
+| Gender | Categorical | Female / Male / Non-binary |
+| First-Generation Student | Binary | First-Gen / Continuing |
+| SES Index | Continuous (auto-binned) | Low / Medium / High |
+
+Computed metrics per group:
+- **Equal Opportunity Gap** — max − min TPR across groups (threshold ≤ 0.10)
+- **Demographic Parity Gap** — max − min positive prediction rate (threshold ≤ 0.10)
+- **Disparate Impact Ratio** — min/max positive rate (80% rule: ≥ 0.80)
+
+### Dashboard (9 Tabs)
+
+| Tab | Contents |
+|-----|----------|
+| Home | Project abstract, architecture diagram, tech stack, quick metrics snapshot |
+| Student Overview | Prediction badge, probability, feature table, student-friendly explanation |
+| SHAP Explanations | Global SHAP + LIME side-by-side, local waterfall charts, feature agreement table |
+| Counterfactual | Minimal edit table with current/suggested values, steps taken, delta probability |
+| What-If Simulator | 10 live sliders with real-time prediction update and change bar chart |
+| Model Comparison | Metrics table with CV results, McNemar table, ROC curves, calibration curves |
+| Fairness Analysis | Gender / First-Gen / SES group metrics, pass/fail indicators, per-group bar chart |
+| Research Metrics | CV stability table, SHAP–LIME agreement histogram, counterfactual flip-rate analysis |
+| Instructor Report | Technical risk report + downloadable JSON |
 
 ---
 
-## Setup
+## Quick Start
 
 ### 1. Install dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Generate dataset
+### 2. Run the full pipeline (train + evaluate + explain)
+
 ```bash
-python -m src.data_gen --out data/student_data.csv --n 3000
+python scripts/run_all.py
 ```
 
-### 3. Train all models
-```python
-from src.data_loader import load_dataset
-from src.train_model import train, save_model
-from src.config import Paths
-from sklearn.model_selection import train_test_split
+This will:
+- Regenerate `data/student_data.csv` if it doesn't exist
+- Train all 4 models and save to `outputs/models/`
+- Evaluate with 7 metrics + 5-fold CV + McNemar tests
+- Generate SHAP summary plots and local explanation CSVs for all 4 models
+- Generate LIME summary plots and local explanation CSVs for all 4 models
+- Save `outputs/metrics/metrics.json`
 
-PATHS = Paths()
-X, y = load_dataset(PATHS.data_dir / "student_data.csv")
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42, stratify=y
-)
-
-for model_name in ["logreg", "rf", "xgb", "lgbm"]:
-    trained = train(model_name, X_train, y_train)
-    save_model(trained, PATHS.models_dir / f"{model_name}.joblib")
-    print(f"Saved {model_name}")
+**Options:**
+```bash
+python scripts/run_all.py --skip-lime        # Skip LIME (faster, ~2 min vs ~10 min)
+python scripts/run_all.py --models logreg,rf # Train specific models only
+python scripts/run_all.py --regen-data       # Force-regenerate student_data.csv
 ```
 
-### 4. Launch the dashboard
+### 3. Launch the dashboard
+
 ```bash
 streamlit run dashboard.py
 ```
 
-### 5. Launch the API
+### 4. Launch the API
+
 ```bash
 uvicorn app:app --reload
 ```
-API docs: http://127.0.0.1:8000/docs
+
+Interactive docs: http://127.0.0.1:8000/docs
+
+### 5. Run the test suite
+
+```bash
+python -m pytest tests/ -v
+```
+
+Expected: **46 tests passing**.
+
+### 6. Run the research notebooks
+
+Open any notebook in `notebooks/` with Jupyter or VS Code. Run cells top-to-bottom.
+Each notebook is self-contained and imports from `src/`.
 
 ---
 
@@ -136,15 +204,17 @@ API docs: http://127.0.0.1:8000/docs
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/` | Health check, model list |
+| GET | `/` | Health check, model list, endpoint index |
 | GET | `/models/metrics` | All model metrics on test set |
-| POST | `/predict` | Predict mastery probability |
-| POST | `/explain/shap` | SHAP explanation |
-| POST | `/explain/counterfactual` | Counterfactual (minimal edits) |
+| POST | `/predict` | Predict mastery probability + risk tier |
+| POST | `/explain/shap` | SHAP explanation (pre-computed or live) |
+| POST | `/explain/counterfactual` | Minimal edits to flip prediction |
 | POST | `/explain/lime` | LIME local explanation |
 | POST | `/fairness` | Group-level fairness analysis |
+| POST | `/models/compare` | McNemar significance test between two models |
 
 ### Example: Predict
+
 ```bash
 curl -X POST http://127.0.0.1:8000/predict \
   -H "Content-Type: application/json" \
@@ -165,38 +235,121 @@ curl -X POST http://127.0.0.1:8000/predict \
   }'
 ```
 
+### Example: Compare Models (McNemar)
+
+```bash
+curl -X POST http://127.0.0.1:8000/models/compare \
+  -H "Content-Type: application/json" \
+  -d '{"model_a": "rf", "model_b": "logreg"}'
+```
+
 ---
 
 ## Dataset
 
-3,000 synthetic student records with:
-- **10 academic features**: study time, quiz scores, practice completion, attendance, etc.
-- **3 demographic features** (fairness analysis only, NOT used in model training):
-  - `gender` (0=female, 1=male, 2=non-binary)
-  - `ses_index` (socioeconomic status 0-1)
-  - `first_gen` (first-generation student: 0/1)
-- **1 target**: `mastery` (1=on-track, 0=at-risk, ~82% base rate)
+3,000 synthetic student records — 10 academic features + 3 demographic features + 1 target.
+
+### Academic Features (used in model training)
+
+| Feature | Range | Distribution |
+|---------|-------|--------------|
+| `study_time_min` | 0–900 min/wk | Normal(220, 110), SES-adjusted |
+| `practice_completion_rate` | 0–1 | Beta(2.2, 1.8) |
+| `avg_quiz_score` | 0–100 | Normal(72, 14), SES-adjusted |
+| `quiz_attempts` | 0–25 | Poisson(4.5), first-gen adjusted |
+| `hint_usage_rate` | 0–1 | Beta(1.7, 3.0), first-gen adjusted |
+| `attendance_rate` | 0–1 | Beta(4.0, 1.6), SES-adjusted |
+| `days_since_last_activity` | 0–30 days | Gamma(2.2, 2.2), SES-adjusted |
+| `stress_index` | 0–1 | Beta(2.0, 2.2), SES+first-gen adjusted |
+| `prereq_mastery` | 0–1 | Beta(2.5, 2.0), first-gen adjusted |
+| `device_reliability` | 0–1 | Beta(5.0, 1.8), SES-adjusted |
+
+### Demographic Features (fairness analysis only — NOT used in training)
+
+| Feature | Values | Equity Effect |
+|---------|--------|---------------|
+| `gender` | 0=female, 1=male, 2=non-binary | Independent (no feature adjustment) |
+| `ses_index` | 0.0–1.0 continuous | Low SES: −55 min study, −7% attendance, −12% device reliability |
+| `first_gen` | 0/1 (35% prevalence) | First-gen: −9% prereq mastery, fewer quiz attempts, higher hint usage |
+
+### Target
+
+`mastery` — 1 = on-track, 0 = at-risk. Generated via sigmoid of a linear combination
+of academic features with a bias term calibrated to ~77–83% mastery rate. Low-SES and
+first-generation students show materially lower mastery rates, enabling realistic
+fairness gap analysis.
 
 ---
 
-## Research Contributions
+## Counterfactual Engine
 
-1. **Dual XAI Methods**: SHAP and LIME explanations for every model enable comparison of explanation fidelity and stability.
-2. **Dual Audience Design**: Student-friendly explanations use approachable language and actionable suggestions; instructor reports provide technical detail, risk tiers, and intervention guidance.
-3. **Controllable Counterfactuals**: The counterfactual engine only modifies features students can realistically change (practice completion, study time, attendance).
-4. **Fairness-First Evaluation**: All models evaluated on demographic subgroup fairness, addressing a critical gap in educational AI research.
-5. **Production-Ready API**: Full REST API with Pydantic validation enables integration with LMS platforms.
+The engine performs greedy hill-climbing over **7 controllable features**:
+
+| Feature | Direction | Interpretation |
+|---------|-----------|----------------|
+| `practice_completion_rate` | Increase | Do more practice problems |
+| `study_time_min` | Increase | Study longer each week |
+| `attendance_rate` | Increase | Attend more sessions |
+| `quiz_attempts` | Increase | Take more quizzes |
+| `prereq_mastery` | Increase | Review prerequisite material |
+| `hint_usage_rate` | Decrease | Attempt problems without hints first |
+| `stress_index` | Decrease | Use stress management strategies |
+
+At each step, the algorithm tries all 7 incremental changes and applies the one that
+most increases the mastery probability, stopping when the prediction flips (p ≥ 0.5)
+or the maximum step count is reached. The result includes `steps_taken`, `delta_prob`,
+and the full edit history.
+
+---
+
+## Notebooks
+
+| Notebook | Contents |
+|----------|----------|
+| `01_data_exploration.ipynb` | Feature distributions by class, correlation heatmap, equity gap bar charts, feature–mastery correlations |
+| `02_model_comparison.ipynb` | Training all 4 models, test metrics, 5-fold CV, ROC + calibration curves, McNemar tests, learning curves |
+| `03_xai_deep_dive.ipynb` | SHAP global/local, LIME comparison, SHAP–LIME agreement distribution, counterfactual flip rates, fairness across all 3 axes |
+| `04_case_studies.ipynb` | End-to-end pipeline for 4 students (Strong / Borderline / At Risk / High Risk) — feature profiles, SHAP waterfalls, counterfactuals, instructor reports, radar chart |
+
+---
+
+## Test Suite
+
+46 tests across 4 modules:
+
+| File | Coverage |
+|------|----------|
+| `test_data_gen.py` | Shape, ranges, target balance, SES gap, first-gen gap, reproducibility |
+| `test_evaluate.py` | Metric keys/ranges, perfect model, CV structure, McNemar keys/p-value, calibration |
+| `test_fairness.py` | Binning, group metric keys, DI ratio range, SES auto-bin, known-gap detection |
+| `test_counterfactual.py` | Controllable features, flip logic, bounds, delta consistency, step limits |
+
+---
+
+## Technology Stack
+
+| Layer | Library |
+|-------|---------|
+| ML Models | scikit-learn, XGBoost ≥ 2.0, LightGBM ≥ 4.0 |
+| XAI | SHAP ≥ 0.51, LIME ≥ 0.2 |
+| Dashboard | Streamlit ≥ 1.35, Plotly ≥ 5.22 |
+| API | FastAPI ≥ 0.111, Pydantic v2, uvicorn |
+| Data | pandas ≥ 2.2, numpy ≥ 2.1 |
+| Statistics | scipy ≥ 1.13 (McNemar, calibration) |
+| Testing | pytest ≥ 9.0 |
 
 ---
 
 ## Future Work
-- Integration with real LMS data (Canvas, Moodle)
+
+- Integration with real LMS data (Canvas, Moodle export)
 - Temporal / longitudinal modeling (student trajectories over time)
 - DiCE diverse counterfactuals for richer what-if analysis
 - LLM-powered natural language explanation generation
-- Automated fairness mitigation (reweighting, post-processing)
-- Learning path recommendations based on counterfactual analysis
+- Automated fairness mitigation (reweighting, post-processing threshold calibration)
+- Learning path recommendations derived from counterfactual paths
+- Multi-institution federated learning with differential privacy
 
 ---
 
-*XAI-ED — Phase 2 Complete*
+*XAI-ED — Phase 3 Complete*
